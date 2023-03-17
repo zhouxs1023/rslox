@@ -1,11 +1,14 @@
+use crate::value::*;
 
 #[derive(Debug)]
 pub enum OpCode {
+    OpConstant(u8),
     OpReturn,
 }
 
 pub struct Chunk {
     code: Vec<OpCode>,
+    constants: Vec<Value>
 }
 
 impl Chunk {
@@ -13,6 +16,7 @@ impl Chunk {
     pub fn new() -> Chunk {
         Chunk {
             code: Vec::new(),
+            constants: Vec::new()
         }
     }
 
@@ -38,6 +42,7 @@ impl Chunk {
         let instruction = &self.code[offset];
 
         match instruction {
+            OpCode::OpConstant(index) => self.constant_instruction("OP_CONSTANT", offset, (*index).into()),
             OpCode::OpReturn => self.simple_instruction("OP_RETURN", offset),
         }
 
@@ -46,5 +51,17 @@ impl Chunk {
     pub fn simple_instruction(&self, name: &str, idx: usize) -> usize {
         println!("{}", name);
         idx + 1
+    }
+
+    pub fn add_constant(&mut self, value: Value) ->usize {
+        self.constants.push(value);
+        self.constants.len() - 1
+    }
+
+    fn constant_instruction(&self, name: &str, offset: usize, idx: usize) -> usize {
+        print!("{} {:?} '", name, idx);
+        print_value(&self.constants[idx]);
+        println!("'");
+        offset + 1
     }
 }
