@@ -8,7 +8,8 @@ pub enum OpCode {
 
 pub struct Chunk {
     code: Vec<OpCode>,
-    constants: Vec<Value>
+    constants: Vec<Value>,
+    lines: Vec<usize>,
 }
 
 impl Chunk {
@@ -16,13 +17,15 @@ impl Chunk {
     pub fn new() -> Chunk {
         Chunk {
             code: Vec::new(),
-            constants: Vec::new()
+            constants: Vec::new(),
+            lines: Vec::new(),
         }
     }
 
-    pub fn write_chunk(&mut self, byte: OpCode) -> () {
+    pub fn write_chunk(&mut self, byte: OpCode, line: usize) -> () {
 
         self.code.push(byte);
+        self.lines.push(line);
     }
 
     pub fn disassemble_chunk(&self, name: &str) {
@@ -38,6 +41,12 @@ impl Chunk {
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
 
         print!("{:04} ", offset);
+
+        if offset > 0 && self.lines[offset] == self.lines[offset - 1] {
+            print!("  | ");
+        } else {
+            print!("{} ", self.lines[offset]);
+        }
 
         let instruction = &self.code[offset];
 
