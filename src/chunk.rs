@@ -7,9 +7,9 @@ pub enum OpCode {
 }
 
 pub struct Chunk {
-    code: Vec<OpCode>,
-    constants: Vec<Value>,
-    lines: Vec<usize>,
+    pub code: Vec<OpCode>,
+    pub constants: Vec<Value>,
+    pub lines: Vec<usize>,
 }
 
 impl Chunk {
@@ -28,6 +28,7 @@ impl Chunk {
         self.lines.push(line);
     }
 
+    #[allow(dead_code)]
     pub fn disassemble_chunk(&self, name: &str) {
 
         println!("== {} ==", name);
