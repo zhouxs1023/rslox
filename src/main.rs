@@ -7,6 +7,7 @@ mod chunk;
 mod value;
 mod vm;
 mod compiler;
+mod scanner;
 
 fn main() {
 
