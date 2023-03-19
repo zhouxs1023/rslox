@@ -1,9 +1,10 @@
 use crate::chunk::{Chunk, OpCode};
-use crate::value::print_value;
+use crate::value::{print_value, Value};
 
 pub struct VM {
-    chunk: Chunk,
-    ip: usize,
+    pub chunk: Chunk,
+    pub ip: usize,
+    pub stack: Vec<Value>,
 }
 
 #[allow(dead_code)]
@@ -19,6 +20,7 @@ impl VM {
         VM {
             chunk: Chunk::new(),
             ip: 0,
+            stack: Vec::new(),
         }
     }
 
@@ -37,11 +39,14 @@ impl VM {
 
             match opcode {
                 OpCode::OpReturn => {
+                    print_value(&self.stack.pop().unwrap());
+                    print!("\n");
                     return InterpretResult::Ok;
                 }
                 OpCode::OpConstant(index) => {
                     let constant = &self.chunk.constants[*index as usize];
                     print_value(constant);
+                    self.stack.push(*constant);
                     print!("\n");
                 }
             }
@@ -50,6 +55,15 @@ impl VM {
     }
 
     pub fn debug_trace_execution(&self) {
+
+        println!("          ");
+        for slot in self.stack.iter() {
+            print!("[ ");
+            print_value(slot);
+            print!(" ]");
+        }
+        println!(" ");
+
         self.chunk.disassemble_instruction(self.ip);
     }
 }
