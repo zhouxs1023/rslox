@@ -44,6 +44,14 @@ impl VM {
                     return InterpretResult::Ok;
                 }
 
+                OpCode::OpAdd => self.binary_op(|a, b| a + b),
+
+                OpCode::OpSubtract => self.binary_op(|a, b| a - b),
+
+                OpCode::OpMultiply => self.binary_op(|a, b| a * b),
+
+                OpCode::OpDivide => self.binary_op(|a, b| a / b),
+
                 OpCode::OpNegate => {
                     let num = self.stack.pop().unwrap();
                     self.stack.push(-num);
@@ -58,6 +66,14 @@ impl VM {
             }
             self.ip += 1;
         }
+    }
+
+    pub  fn binary_op(&mut self, f: fn(f64, f64) -> f64) {
+        let b = self.stack.pop().unwrap();
+        let a = self.stack.pop().unwrap();
+
+        let result = f(a, b);
+        self.stack.push(result)
     }
 
     pub fn debug_trace_execution(&self) {
