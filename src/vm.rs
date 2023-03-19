@@ -1,5 +1,8 @@
 use crate::chunk::{Chunk, OpCode};
 use crate::value::{print_value, Value};
+use crate::compiler::{compile};
+use std::fs;
+use std::process::exit;
 
 pub struct VM {
     pub chunk: Chunk,
@@ -24,10 +27,9 @@ impl VM {
         }
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = chunk;
-        self.ip = 0;
-        self.run()
+    pub fn interpret(&mut self, source: &str) -> InterpretResult {
+        compile(source);
+        return InterpretResult::Ok;
     }
 
     pub fn run(&mut self) -> InterpretResult {
@@ -65,6 +67,17 @@ impl VM {
                 }
             }
             self.ip += 1;
+        }
+    }
+
+    pub fn run_file(&mut self, path: &str) {
+        let source = fs::read_to_string(path).expect("Could not open file");
+        let result = self.interpret(source.as_str());
+
+        match result {
+            InterpretResult::CompileError => exit(65),
+            InterpretResult::RuntimeError => exit(70),
+            InterpretResult::Ok => exit(0),
         }
     }
 
