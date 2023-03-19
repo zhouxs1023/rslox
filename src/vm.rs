@@ -43,6 +43,12 @@ impl VM {
                     print!("\n");
                     return InterpretResult::Ok;
                 }
+
+                OpCode::OpNegate => {
+                    let num = self.stack.pop().unwrap();
+                    self.stack.push(-num);
+                }
+
                 OpCode::OpConstant(index) => {
                     let constant = &self.chunk.constants[*index as usize];
                     print_value(constant);
