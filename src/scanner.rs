@@ -16,13 +16,153 @@ impl<'src> Scanner<'src> {
     }
 
     pub fn scan_token(&mut self) -> Token {
+        self.skip_whitespace();
+
         self.start = self.current;
 
         if self.is_at_end() {
             return self.make_token(TokenType::Eof);
         }
 
-        self.error_token("Unexpected character.")
+        let c = self.advance();
+
+        if is_alpha(c) {
+            return self.identifier();
+        }
+
+        if is_digit(c) {
+            return self.number();
+        }
+
+        match c {
+            b'(' => self.make_token(TokenType::LeftParen),
+            b')' => self.make_token(TokenType::RightParen),
+            b'{' => self.make_token(TokenType::LeftBrace),
+            b'}' => self.make_token(TokenType::RightBrace),
+            b';' => self.make_token(TokenType::Semicolon),
+            b',' => self.make_token(TokenType::Comma),
+            b'.' => self.make_token(TokenType::Dot),
+            b'-' => self.make_token(TokenType::Minus),
+            b'+' => self.make_token(TokenType::Plus),
+            b'/' => self.make_token(TokenType::Slash),
+            b'*' => self.make_token(TokenType::Star),
+            b'!' if self.check_next(b'=') => self.make_token(TokenType::BangEqual),
+            b'!' => self.make_token(TokenType::Bang),
+            b'=' if self.check_next(b'=') => self.make_token(TokenType::EqualEqual),
+            b'=' => self.make_token(TokenType::Equal),
+            b'<' if self.check_next(b'=') => self.make_token(TokenType::LessEqual),
+            b'<' => self.make_token(TokenType::Less),
+            b'>' if self.check_next(b'=') => self.make_token(TokenType::GreaterEqual),
+            b'>' => self.make_token(TokenType::Greater),
+            b'"' => self.string(),
+            _ => self.error_token("Unexpected character."),
+        }
+    }
+
+    fn advance(&mut self) -> u8 {
+        let char = self.src.as_bytes()[self.current];
+        self.current += 1;
+        char
+    }
+
+    fn peek(&self) -> u8 {
+        if self.is_at_end() {
+            b'0'
+        } else {
+            self.src.as_bytes()[self.current]
+        }
+    }
+
+    fn peek_next(&self)  -> u8 {
+        if self.current > self.src.len() - 2 {
+            b'0'
+        } else {
+            self.src.as_bytes()[self.current + 1]
+        }
+    }
+
+    fn check_next(&mut self, expected: u8) -> bool {
+        if self.is_at_end() || self.src.as_bytes()[self.current] != expected {
+            false
+        } else {
+            self.current += 1;
+            true
+        }
+    }
+
+    fn skip_whitespace(&mut self) {
+        loop {
+            let c = self.peek();
+            match c {
+                b' ' | b'\r' | b'\t' => {
+                    self.advance();
+                }
+                b'\n' => {
+                    self.line += 1;
+                    self.advance();
+                }
+                b'/' => {
+                    if self.peek_next() == b'/' {
+                        while self.peek() != b'\n' && !self.is_at_end() {
+                            self.advance();
+                        }
+                    } else {
+                        return;
+                    }
+                    break;
+                }
+                _ => return,
+            }
+        }
+    }
+
+    fn check_keyword(
+        &self,
+        start: usize,
+        length: usize,
+        rest: &str,
+        token_type: TokenType,
+    ) -> TokenType {
+        if self.current - self.start == start + length
+            && &self.src[self.start + start..self.start + start + length] == rest
+        {
+            return token_type;
+        }
+        TokenType::Identifier
+    }
+
+    fn identifier_type(&self) -> TokenType {
+        match self.src.as_bytes()[self.start] {
+            b'a' => self.check_keyword(1, 2, "nd", TokenType::And),
+            b'c' => self.check_keyword(1, 4, "lass", TokenType::Class),
+            b'e' => self.check_keyword(1, 3, "lse", TokenType::Else),
+            b'f' if self.current - self.start > 1 => {
+                // lexeme is more than 2 char
+                match self.src.as_bytes()[self.start + 1] {
+                    b'a' => self.check_keyword(2, 3, "lse", TokenType::False),
+                    b'o' => self.check_keyword(2, 1, "r", TokenType::For),
+                    b'u' => self.check_keyword(2, 1, "n", TokenType::Fun),
+                    _ => TokenType::Identifier,
+                }
+            }
+            b'i' => self.check_keyword(1, 1, "f", TokenType::If),
+            b'n' => self.check_keyword(1, 2, "il", TokenType::Nil),
+            b'o' => self.check_keyword(1, 1, "r", TokenType::Or),
+            b'p' => self.check_keyword(1, 4, "rint", TokenType::Print),
+            b'r' => self.check_keyword(1, 5, "eturn", TokenType::Return),
+            b's' => self.check_keyword(1, 4, "uper", TokenType::Super),
+            b'f' if self.current - self.start > 1 => {
+                // lexeme is more than 2 char
+                match self.src.as_bytes()[self.start + 1] {
+                    b'h' => self.check_keyword(2, 2, "is", TokenType::This),
+                    b'r' => self.check_keyword(2, 2, "ue", TokenType::True),
+                    _ => TokenType::Identifier,
+                }
+            }
+            b'v' => self.check_keyword(1, 2, "ar", TokenType::Var),
+            b'w' => self.check_keyword(1, 4, "hile", TokenType::While),
+            _ => TokenType::Identifier,
+        }
     }
 
     fn is_at_end(&self) -> bool {
@@ -33,7 +173,7 @@ impl<'src> Scanner<'src> {
         Token {
             token_type,
             line: self.line,
-            lexeme: &self.src[self.start..self.current - self.start],
+            lexeme: &self.src[self.start..self.current],
         }
     }
 
@@ -44,6 +184,48 @@ impl<'src> Scanner<'src> {
             lexeme: message,
         }
     }
+
+    fn identifier(&mut self) -> Token {
+        while is_alpha(self.peek()) || is_digit(self.peek()) {
+            self.advance();
+        }
+        self.make_token(self.identifier_type())
+    }
+
+    fn number(&mut self) -> Token {
+
+        while is_digit(self.peek()) {
+            self.advance();
+        }
+
+        if self.peek() == b'.' && is_digit(self.peek_next()) {
+            // Consume the ".".
+            self.advance();
+
+            while is_digit(self.peek()) {
+                self.advance();
+            }
+        }
+
+        self.make_token(TokenType::Number)
+    }
+
+    fn string(&mut self) -> Token {
+        while self.peek() != b'"' && !self.is_at_end() {
+            if self.peek() == b'\n' {
+                self.line += 1
+            }
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            return self.error_token("Unterminated string.");
+        }
+
+        // The closing quote.
+        self.advance();
+        self.make_token(TokenType::String)
+    }
 }
 
 pub struct Token<'src> {
@@ -52,6 +234,17 @@ pub struct Token<'src> {
     pub lexeme: &'src str,
 }
 
+impl<'src> Token<'src> {
+    fn new(token_type: TokenType, line: usize, lexeme: &'src str) -> Token<'src> {
+        Token {
+            token_type,
+            line,
+            lexeme,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TokenType {
     LeftParen,
     RightParen,
@@ -100,4 +293,12 @@ pub enum TokenType {
 
     Error,
     Eof,
+}
+
+fn is_alpha(c: u8) -> bool {
+    c.is_ascii_alphabetic() || c == b'_'
+}
+
+fn is_digit(c: u8) -> bool {
+    c.is_ascii_digit()
 }
