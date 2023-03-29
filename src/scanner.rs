@@ -15,7 +15,7 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    pub fn scan_token(&mut self) -> Token {
+    pub fn scan_token(&mut self) -> Token<'src> {
         self.skip_whitespace();
 
         self.start = self.current;
@@ -169,7 +169,7 @@ impl<'src> Scanner<'src> {
         self.current == self.src.len()
     }
 
-    fn make_token(&self, token_type: TokenType) -> Token {
+    fn make_token(&self, token_type: TokenType) -> Token<'src> {
         Token {
             token_type,
             line: self.line,
@@ -177,7 +177,7 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    fn error_token(&self, message: &'static str) -> Token {
+    fn error_token(&self, message: &'static str) -> Token<'src> {
         Token {
             token_type: TokenType::Error,
             line: self.line,
@@ -185,14 +185,14 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    fn identifier(&mut self) -> Token {
+    fn identifier(&mut self) -> Token<'src> {
         while is_alpha(self.peek()) || is_digit(self.peek()) {
             self.advance();
         }
         self.make_token(self.identifier_type())
     }
 
-    fn number(&mut self) -> Token {
+    fn number(&mut self) -> Token<'src> {
 
         while is_digit(self.peek()) {
             self.advance();
@@ -210,7 +210,7 @@ impl<'src> Scanner<'src> {
         self.make_token(TokenType::Number)
     }
 
-    fn string(&mut self) -> Token {
+    fn string(&mut self) -> Token<'src> {
         while self.peek() != b'"' && !self.is_at_end() {
             if self.peek() == b'\n' {
                 self.line += 1
@@ -228,6 +228,7 @@ impl<'src> Scanner<'src> {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Token<'src> {
     pub token_type: TokenType,
     pub line: usize,
@@ -235,7 +236,7 @@ pub struct Token<'src> {
 }
 
 impl<'src> Token<'src> {
-    fn new(token_type: TokenType, line: usize, lexeme: &'src str) -> Token<'src> {
+    pub fn new(token_type: TokenType, line: usize, lexeme: &'src str) -> Token<'src> {
         Token {
             token_type,
             line,

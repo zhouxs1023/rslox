@@ -1,8 +1,6 @@
 use crate::chunk::{Chunk, OpCode};
 use crate::value::{print_value, Value};
-use crate::compiler::{compile};
-use std::fs;
-use std::process::exit;
+use crate::compiler::Parser;
 
 pub struct VM {
     pub chunk: Chunk,
@@ -10,7 +8,7 @@ pub struct VM {
     pub stack: Vec<Value>,
 }
 
-#[allow(dead_code)]
+#[derive(PartialEq, Debug)]
 pub enum InterpretResult {
     Ok,
     CompileError,
@@ -28,30 +26,35 @@ impl VM {
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
-        compile(source);
-        return InterpretResult::Ok;
+        let mut parser = Parser::new(source);
+
+        if !parser.compile() {
+            return InterpretResult::CompileError;
+        }
+
+        self.chunk = parser.chunk;
+        self.ip = 0; // or self.chunk.code?
+
+        self.run()
     }
 
     pub fn run(&mut self) -> InterpretResult {
 
         loop {
-            self.debug_trace_execution();
+           self.debug_trace_execution();
 
             let opcode = &self.chunk.code[self.ip];
 
             match opcode {
                 OpCode::OpReturn => {
                     print_value(&self.stack.pop().unwrap());
-                    print!("\n");
+                    println!();
                     return InterpretResult::Ok;
                 }
 
                 OpCode::OpAdd => self.binary_op(|a, b| a + b),
-
                 OpCode::OpSubtract => self.binary_op(|a, b| a - b),
-
                 OpCode::OpMultiply => self.binary_op(|a, b| a * b),
-
                 OpCode::OpDivide => self.binary_op(|a, b| a / b),
 
                 OpCode::OpNegate => {
@@ -70,17 +73,6 @@ impl VM {
         }
     }
 
-    pub fn run_file(&mut self, path: &str) {
-        let source = fs::read_to_string(path).expect("Could not open file");
-        let result = self.interpret(source.as_str());
-
-        match result {
-            InterpretResult::CompileError => exit(65),
-            InterpretResult::RuntimeError => exit(70),
-            InterpretResult::Ok => exit(0),
-        }
-    }
-
     pub  fn binary_op(&mut self, f: fn(f64, f64) -> f64) {
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
@@ -90,7 +82,6 @@ impl VM {
     }
 
     pub fn debug_trace_execution(&self) {
-
         println!("          ");
         for slot in self.stack.iter() {
             print!("[ ");

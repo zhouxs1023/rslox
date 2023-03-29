@@ -27,15 +27,13 @@ impl Chunk {
         }
     }
 
-    pub fn write_chunk(&mut self, byte: OpCode, line: usize) -> () {
-
+    pub fn write_chunk(&mut self, byte: OpCode, line: usize) {
         self.code.push(byte);
         self.lines.push(line);
     }
 
     #[allow(dead_code)]
     pub fn disassemble_chunk(&self, name: &str) {
-
         println!("== {} ==", name);
 
         let mut idx = 0;
@@ -73,8 +71,8 @@ impl Chunk {
         idx + 1
     }
 
-    pub fn add_constant(&mut self, value: Value) ->usize {
-        self.constants.push(value);
+    pub fn add_constant(&mut self, val: Value) -> usize {
+        self.constants.push(val);
         self.constants.len() - 1
     }
 
