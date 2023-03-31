@@ -120,7 +120,7 @@ impl<'src> Parser<'src> {
         );
         rule_map.insert(
             TokenType::BangEqual,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(None, Some(Parser::binary), Precedence::Equality),
         );
         rule_map.insert(
             TokenType::Equal,
@@ -128,23 +128,23 @@ impl<'src> Parser<'src> {
         );
         rule_map.insert(
             TokenType::EqualEqual,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(None, Some(Parser::binary), Precedence::Equality),
         );
         rule_map.insert(
             TokenType::Greater,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         );
         rule_map.insert(
             TokenType::GreaterEqual,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         );
         rule_map.insert(
             TokenType::Less,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         );
         rule_map.insert(
             TokenType::LessEqual,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(None, Some(Parser::binary), Precedence::Comparison),
         );
         rule_map.insert(
             TokenType::Identifier,
@@ -298,6 +298,12 @@ impl<'src> Parser<'src> {
             TokenType::Minus => self.emit_byte(OpCode::OpSubtract),
             TokenType::Star  => self.emit_byte(OpCode::OpMultiply),
             TokenType::Slash => self.emit_byte(OpCode::OpDivide),
+            TokenType::BangEqual => self.emit_bytes(OpCode::OpEqual, OpCode::OpNot),
+            TokenType::EqualEqual => self.emit_byte(OpCode::OpEqual),
+            TokenType::Greater => self.emit_byte(OpCode::OpGreater),
+            TokenType::GreaterEqual => self.emit_bytes(OpCode::OpLess, OpCode::OpNot),
+            TokenType::Less => self.emit_byte(OpCode::OpLess),
+            TokenType::LessEqual => self.emit_bytes(OpCode::OpGreater, OpCode::OpNot),
             _ => ()   // Unreachable.
         }
     }

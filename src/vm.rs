@@ -1,5 +1,5 @@
 use crate::chunk::{Chunk, OpCode};
-use crate::value::{print_value, Value};
+use crate::value::{print_value, Value, values_equal};
 use crate::compiler::Parser;
 
 pub struct VM {
@@ -73,6 +73,13 @@ impl VM {
                 OpCode::OpNil => self.stack.push(Value::Nil),
                 OpCode::OpTrue => self.stack.push(Value::Bool(true)),
                 OpCode::OpFalse => self.stack.push(Value::Bool(false)),
+                OpCode::OpEqual => {
+                    let val1 = self.stack.pop().expect("Empty stack");
+                    let val2 = self.stack.pop().expect("Empty stack");
+                    self.stack.push(Value::Bool(values_equal(val1, val2)));
+                }
+                OpCode::OpGreater =>  self.binary_op_bool(|a, b| a > b),
+                OpCode::OpLess => self.binary_op_bool(|a, b| a < b),
                 OpCode::OpAdd => self.binary_op(|a, b| a + b),
                 OpCode::OpSubtract => self.binary_op(|a, b| a - b),
                 OpCode::OpMultiply => self.binary_op(|a, b| a * b),
@@ -97,6 +104,21 @@ impl VM {
             }
             _ => {
                 self.runtime_error("Operands must be two numbers or two strings");
+            }
+        }
+    }
+
+    pub  fn binary_op_bool(&mut self, f: fn(f64, f64) -> bool) {
+        let b = self.stack.pop().expect("Empty stack");
+        let a = self.stack.pop().expect("Empty stack");
+
+        match (a, b) {
+            (Value::Number(a), Value::Number(b)) => {
+                let result = f(a, b);
+                self.stack.push(Value::Bool(result));
+            }
+            _ => {
+                self.runtime_error("Operands must be boolean.");
             }
         }
     }
