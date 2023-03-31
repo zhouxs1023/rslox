@@ -3,7 +3,6 @@ use crate::scanner::{Scanner, Token, TokenType};
 use crate::value::Value;
 
 use std::{collections::HashMap, convert::TryFrom};
-use crate::chunk::OpCode::{OpFalse, OpNil};
 
 #[derive(PartialEq, PartialOrd)]
 enum Precedence {
@@ -117,7 +116,7 @@ impl<'src> Parser<'src> {
         );
         rule_map.insert(
             TokenType::Bang,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(Some(Parser::unary), None, Precedence::None),
         );
         rule_map.insert(
             TokenType::BangEqual,
@@ -331,6 +330,7 @@ impl<'src> Parser<'src> {
         // Emit the operator instruction.
         match op_type {
             TokenType::Minus => self.emit_byte(OpCode::OpNegate),
+            TokenType::Bang  => self.emit_byte(OpCode::OpNot),
             _ => ()
         }
     }

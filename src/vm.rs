@@ -77,6 +77,10 @@ impl VM {
                 OpCode::OpSubtract => self.binary_op(|a, b| a - b),
                 OpCode::OpMultiply => self.binary_op(|a, b| a * b),
                 OpCode::OpDivide => self.binary_op(|a, b| a / b),
+                OpCode::OpNot => {
+                    let val = self.stack.pop().unwrap();
+                    self.stack.push(Value::Bool(self.is_falsey(val)))
+                },
             }
             self.ip += 1;
         }
@@ -94,6 +98,14 @@ impl VM {
             _ => {
                 self.runtime_error("Operands must be two numbers or two strings");
             }
+        }
+    }
+
+    fn is_falsey(&self, val: Value) -> bool {
+        match val {
+            Value::Bool(b) => !b,
+            Value::Nil => true,
+            _ => false
         }
     }
 
