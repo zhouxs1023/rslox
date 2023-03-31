@@ -70,6 +70,9 @@ impl VM {
                     }
                 },
 
+                OpCode::OpNil => self.stack.push(Value::Nil),
+                OpCode::OpTrue => self.stack.push(Value::Bool(true)),
+                OpCode::OpFalse => self.stack.push(Value::Bool(false)),
                 OpCode::OpAdd => self.binary_op(|a, b| a + b),
                 OpCode::OpSubtract => self.binary_op(|a, b| a - b),
                 OpCode::OpMultiply => self.binary_op(|a, b| a * b),

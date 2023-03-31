@@ -3,6 +3,9 @@ use crate::value::*;
 #[derive(Debug)]
 pub enum OpCode {
     OpConstant(u8),
+    OpNil,
+    OpTrue,
+    OpFalse,
     OpAdd,
     OpSubtract,
     OpMultiply,
@@ -56,6 +59,9 @@ impl Chunk {
 
         match instruction {
             OpCode::OpConstant(index) => self.constant_instruction("OP_CONSTANT", offset, (*index).into()),
+            OpCode::OpNil => self.simple_instruction("OP_NIL", offset),
+            OpCode::OpTrue => self.simple_instruction("OP_TRUE", offset),
+            OpCode::OpFalse => self.simple_instruction("OP_FALSE", offset),
             OpCode::OpAdd => self.simple_instruction("OP_ADD", offset),
             OpCode::OpSubtract => self.simple_instruction("OP_SUBTRACT", offset),
             OpCode::OpMultiply => self.simple_instruction("OP_MULTIPLY", offset),

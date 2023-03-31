@@ -3,6 +3,7 @@ use crate::scanner::{Scanner, Token, TokenType};
 use crate::value::Value;
 
 use std::{collections::HashMap, convert::TryFrom};
+use crate::chunk::OpCode::{OpFalse, OpNil};
 
 #[derive(PartialEq, PartialOrd)]
 enum Precedence {
@@ -169,12 +170,12 @@ impl<'src> Parser<'src> {
         );
         rule_map.insert(
             TokenType::False,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(Some(Parser::literal), None, Precedence::None),
         );
         rule_map.insert(TokenType::For, ParseRule::new(None, None, Precedence::None));
         rule_map.insert(TokenType::Fun, ParseRule::new(None, None, Precedence::None));
         rule_map.insert(TokenType::If, ParseRule::new(None, None, Precedence::None));
-        rule_map.insert(TokenType::Nil, ParseRule::new(None, None, Precedence::None));
+        rule_map.insert(TokenType::Nil, ParseRule::new(Some(Parser::literal), None, Precedence::None));
         rule_map.insert(TokenType::Or, ParseRule::new(None, None, Precedence::None));
         rule_map.insert(
             TokenType::Print,
@@ -194,7 +195,7 @@ impl<'src> Parser<'src> {
         );
         rule_map.insert(
             TokenType::True,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(Some(Parser::literal), None, Precedence::None),
         );
         rule_map.insert(TokenType::Var, ParseRule::new(None, None, Precedence::None));
         rule_map.insert(
@@ -299,6 +300,15 @@ impl<'src> Parser<'src> {
             TokenType::Star  => self.emit_byte(OpCode::OpMultiply),
             TokenType::Slash => self.emit_byte(OpCode::OpDivide),
             _ => ()   // Unreachable.
+        }
+    }
+
+    fn literal(&mut self) {
+        match self.previous.token_type {
+            TokenType::False => self.emit_byte(OpCode::OpFalse),
+            TokenType::Nil   => self.emit_byte(OpCode::OpNil),
+            TokenType::True  => self.emit_byte(OpCode::OpTrue),
+            _ => () // Unreachable.
         }
     }
 
