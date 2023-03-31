@@ -1,5 +1,7 @@
 use crate::chunk::{Chunk, OpCode};
 use crate::scanner::{Scanner, Token, TokenType};
+use crate::value::Value;
+
 use std::{collections::HashMap, convert::TryFrom};
 
 #[derive(PartialEq, PartialOrd)]
@@ -233,7 +235,7 @@ impl<'src> Parser<'src> {
             self.current = self.scanner.scan_token();
             if self.current.token_type != TokenType::Error {
                 break;
-            }
+            };
 
             self.error_at_current(self.current.lexeme);
         }
@@ -263,7 +265,7 @@ impl<'src> Parser<'src> {
         self.emit_byte(OpCode::OpReturn);
     }
 
-    fn make_constant(&mut self, val: f64) -> u8 {
+    fn make_constant(&mut self, val: Value) -> u8 {
         let idx = self.chunk.add_constant(val);
         match u8::try_from(idx) {
             Ok(idx) => idx,
@@ -275,7 +277,7 @@ impl<'src> Parser<'src> {
     }
 
     fn emit_constant(&mut self, val: f64) {
-        let con_idx = self.make_constant(val);
+        let con_idx = self.make_constant(Value::Number(val));
         self.emit_byte(OpCode::OpConstant(con_idx));
     }
 

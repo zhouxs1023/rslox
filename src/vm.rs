@@ -47,19 +47,9 @@ impl VM {
 
             match opcode {
                 OpCode::OpReturn => {
-                    print_value(&self.stack.pop().unwrap());
+                    print_value(&self.stack.pop().expect("Empty stack"));
                     println!();
                     return InterpretResult::Ok;
-                }
-
-                OpCode::OpAdd => self.binary_op(|a, b| a + b),
-                OpCode::OpSubtract => self.binary_op(|a, b| a - b),
-                OpCode::OpMultiply => self.binary_op(|a, b| a * b),
-                OpCode::OpDivide => self.binary_op(|a, b| a / b),
-
-                OpCode::OpNegate => {
-                    let num = self.stack.pop().unwrap();
-                    self.stack.push(-num);
                 }
 
                 OpCode::OpConstant(index) => {
@@ -68,17 +58,40 @@ impl VM {
                     self.stack.push(*constant);
                     print!("\n");
                 }
+
+                OpCode::OpNegate => match self.stack.get(self.stack.len() - 1).expect("Failed to peek") {
+                    Value::Number(val) => {
+                        let neg_val = -*val;
+                        self.stack.pop();
+                        self.stack.push(Value::Number(neg_val));
+                    },
+                    _ => {
+                        return self.runtime_error("Operand must be a number.");
+                    }
+                },
+
+                OpCode::OpAdd => self.binary_op(|a, b| a + b),
+                OpCode::OpSubtract => self.binary_op(|a, b| a - b),
+                OpCode::OpMultiply => self.binary_op(|a, b| a * b),
+                OpCode::OpDivide => self.binary_op(|a, b| a / b),
             }
             self.ip += 1;
         }
     }
 
     pub  fn binary_op(&mut self, f: fn(f64, f64) -> f64) {
-        let b = self.stack.pop().unwrap();
-        let a = self.stack.pop().unwrap();
+        let b = self.stack.pop().expect("Empty stack");
+        let a = self.stack.pop().expect("Empty stack");
 
-        let result = f(a, b);
-        self.stack.push(result)
+        match (a, b) {
+            (Value::Number(a), Value::Number(b)) => {
+                let result = f(a, b);
+                self.stack.push(Value::Number(result));
+            }
+            _ => {
+                self.runtime_error("Operands must be two numbers or two strings");
+            }
+        }
     }
 
     pub fn debug_trace_execution(&self) {
@@ -91,5 +104,14 @@ impl VM {
         println!(" ");
 
         self.chunk.disassemble_instruction(self.ip);
+    }
+
+    fn runtime_error(&self, msg: &str) -> InterpretResult {
+        eprintln!("{}", msg);
+
+        let instruction = self.ip - 1;
+        let line = self.chunk.lines[instruction];
+        eprintln!("[line {}] in script", line);
+        InterpretResult::RuntimeError
     }
 }
