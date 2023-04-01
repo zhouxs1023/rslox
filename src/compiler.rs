@@ -152,7 +152,7 @@ impl<'src> Parser<'src> {
         );
         rule_map.insert(
             TokenType::String,
-            ParseRule::new(None, None, Precedence::None),
+            ParseRule::new(Some(Parser::string), None, Precedence::None),
         );
         rule_map.insert(
             TokenType::Number,
@@ -276,8 +276,8 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn emit_constant(&mut self, val: f64) {
-        let con_idx = self.make_constant(Value::Number(val));
+    fn emit_constant(&mut self, val: Value) {
+        let con_idx = self.make_constant(val);
         self.emit_byte(OpCode::OpConstant(con_idx));
     }
 
@@ -324,7 +324,12 @@ impl<'src> Parser<'src> {
 
     fn number(&mut self) {
         let val = self.previous.lexeme.parse().expect("Cannot convert str to f64");
-        self.emit_constant(val);
+        self.emit_constant(Value::Number(val));
+    }
+
+    fn string(&mut self) {
+        let s: String = self.previous.lexeme[1..self.previous.lexeme.len()-1].to_string();
+        self.emit_constant(Value::Obj(s));
     }
 
     fn unary(&mut self) {

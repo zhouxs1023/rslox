@@ -55,7 +55,7 @@ impl VM {
                 OpCode::OpConstant(index) => {
                     let constant = &self.chunk.constants[*index as usize];
                     print_value(constant);
-                    self.stack.push(*constant);
+                    self.stack.push((*constant).clone());
                     print!("\n");
                 }
 
@@ -73,14 +73,25 @@ impl VM {
                 OpCode::OpNil => self.stack.push(Value::Nil),
                 OpCode::OpTrue => self.stack.push(Value::Bool(true)),
                 OpCode::OpFalse => self.stack.push(Value::Bool(false)),
+
                 OpCode::OpEqual => {
                     let val1 = self.stack.pop().expect("Empty stack");
                     let val2 = self.stack.pop().expect("Empty stack");
                     self.stack.push(Value::Bool(values_equal(val1, val2)));
                 }
+
                 OpCode::OpGreater =>  self.binary_op_bool(|a, b| a > b),
                 OpCode::OpLess => self.binary_op_bool(|a, b| a < b),
-                OpCode::OpAdd => self.binary_op(|a, b| a + b),
+
+                OpCode::OpAdd => {
+                    let b = self.stack.get(self.stack.len() - 1).expect("Failed to get");
+                    let a = self.stack.get(self.stack.len() - 2).expect("Failed to get");
+                    match (b, a) {
+                        (Value::Number(_), Value::Number(_)) => { self.binary_op(|a, b| a + b) },
+                        (Value::Obj(_), Value::Obj(_)) => { self.concatenate().expect("Operands must be two strings."); },
+                        _ => return self.runtime_error("Operands must be two numbers or two strings."),
+                    }
+                },
                 OpCode::OpSubtract => self.binary_op(|a, b| a - b),
                 OpCode::OpMultiply => self.binary_op(|a, b| a * b),
                 OpCode::OpDivide => self.binary_op(|a, b| a / b),
@@ -90,6 +101,18 @@ impl VM {
                 },
             }
             self.ip += 1;
+        }
+    }
+
+    fn concatenate(&mut self)  -> Result<(), InterpretResult> {
+        let b = self.stack.pop().expect("Empty stack");
+        let a = self.stack.pop().expect("Empty stack");
+        match (b, a) {
+            (Value::Obj(b), Value::Obj(a)) => {
+                self.stack.push(Value::Obj(a + &b));
+                Ok(())
+            }
+            _ => Err(self.runtime_error("Operands must be two strings."))
         }
     }
 
