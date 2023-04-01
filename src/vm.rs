@@ -46,18 +46,12 @@ impl VM {
             let opcode = &self.chunk.code[self.ip];
 
             match opcode {
-                OpCode::OpReturn => {
-                    print_value(&self.stack.pop().expect("Empty stack"));
-                    println!();
-                    return InterpretResult::Ok;
-                }
-
                 OpCode::OpConstant(index) => {
                     let constant = &self.chunk.constants[*index as usize];
                     print_value(constant);
                     self.stack.push((*constant).clone());
                     print!("\n");
-                }
+                },
 
                 OpCode::OpNegate => match self.stack.get(self.stack.len() - 1).expect("Failed to peek") {
                     Value::Number(val) => {
@@ -99,6 +93,14 @@ impl VM {
                     let val = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(self.is_falsey(val)))
                 },
+
+                OpCode::OpPrint => {
+                    print_value(&self.stack.pop().expect("Empty stack"));
+                    println!();
+                    return InterpretResult::Ok;
+                },
+
+                OpCode::OpReturn => { return InterpretResult::Ok; },
             }
             self.ip += 1;
         }

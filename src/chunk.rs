@@ -15,6 +15,7 @@ pub enum OpCode {
     OpDivide,
     OpNot,
     OpNegate,
+    OpPrint,
     OpReturn,
 }
 
@@ -75,6 +76,7 @@ impl Chunk {
             OpCode::OpDivide => self.simple_instruction("OP_DIVIDE", offset),
             OpCode::OpNot => self.simple_instruction("OP_NOT", offset),
             OpCode::OpNegate => self.simple_instruction("OP_NEGATE", offset),
+            OpCode::OpPrint => self.simple_instruction("OP_PRINT", offset),
             OpCode::OpReturn => self.simple_instruction("OP_RETURN", offset),
         }
 

@@ -222,8 +222,9 @@ impl<'src> Parser<'src> {
 
     pub fn compile(&mut self) -> bool {
         self.advance();
-        self.expression();
-        self.consume(TokenType::Eof, "Expect end of expression.");
+        while !self.match_type(TokenType::Eof) {
+            self.declaration();
+        }
         self.end_compiler();
         !self.had_error
     }
@@ -247,6 +248,19 @@ impl<'src> Parser<'src> {
             return;
         }
         self.error_at_current(msg);
+    }
+
+    fn check(&mut self, tp: TokenType) -> bool {
+        self.current.token_type == tp
+    }
+
+    fn match_type(&mut self, tp: TokenType) -> bool {
+        if !self.check(tp) {
+            false
+        } else {
+            self.advance();
+            true
+        }
     }
 
     fn emit_byte(&mut self, byte: OpCode) {
@@ -377,6 +391,22 @@ impl<'src> Parser<'src> {
     fn expression(&mut self) {
 
         self.parse_precedence(Precedence::Assignment);
+    }
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon,"Expect ';' after value.");
+        self.emit_byte(OpCode::OpPrint);
+    }
+
+    fn statement(&mut self) {
+        if self.match_type(TokenType::Print) {
+            self.print_statement();
+        }
+    }
+
+    fn declaration(&mut self) {
+        self.statement();
     }
 
     fn error_at(&mut self, token: Token, message: &str) {
