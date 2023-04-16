@@ -88,6 +88,16 @@ impl VM {
                     }
                 },
 
+                OpCode::OpGetLocal => {
+                    let slot: u8 = self.read_opcode().into();
+                    self.stack.push(self.stack[slot as usize].clone());
+                },
+
+                OpCode::OpSetLocal => {
+                    let slot: u8 = self.read_opcode().into();
+                    self.stack[slot as usize] = self.peek(0).clone();
+                },
+
                 OpCode::OpGetGlobal => {
                     if let Value::ObjString(s) = self.read_constant().clone() {
                         if let Some(v) = self.globals.get(&s) {

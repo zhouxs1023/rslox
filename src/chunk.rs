@@ -9,6 +9,8 @@ pub enum OpCode {
     OpFalse,
     OpPop,
     OpDefineGlobal,
+    OpGetLocal,
+    OpSetLocal,
     OpGetGlobal,
     OpSetGlobal,
     OpEqual,
@@ -33,19 +35,21 @@ impl From<u8> for OpCode {
             3 => OpCode::OpFalse,
             4 => OpCode::OpPop,
             5 => OpCode::OpDefineGlobal,
-            6 => OpCode::OpGetGlobal,
-            7 => OpCode::OpSetGlobal,
-            8 => OpCode::OpEqual,
-            9 => OpCode::OpGreater,
-            10 => OpCode::OpLess,
-            11 => OpCode::OpAdd,
-            12 => OpCode::OpSubtract,
-            13 => OpCode::OpMultiply,
-            14 => OpCode::OpDivide,
-            15 => OpCode::OpNot,
-            16 => OpCode::OpNegate,
-            17 => OpCode::OpPrint,
-            18 => OpCode::OpReturn,
+            6 => OpCode::OpGetLocal,
+            7 => OpCode::OpSetLocal,
+            8 => OpCode::OpGetGlobal,
+            9 => OpCode::OpSetGlobal,
+            10 => OpCode::OpEqual,
+            11 => OpCode::OpGreater,
+            12 => OpCode::OpLess,
+            13 => OpCode::OpAdd,
+            14 => OpCode::OpSubtract,
+            15 => OpCode::OpMultiply,
+            16 => OpCode::OpDivide,
+            17 => OpCode::OpNot,
+            18 => OpCode::OpNegate,
+            19 => OpCode::OpPrint,
+            20 => OpCode::OpReturn,
             _  => unimplemented!("Invalid opcode {}", code),
         }
     }
@@ -119,6 +123,8 @@ impl Chunk {
             OpCode::OpFalse => self.simple_instruction("OP_FALSE", offset),
             OpCode::OpPop => self.simple_instruction("OP_POP", offset),
             OpCode::OpDefineGlobal => self.constant_instruction("OP_DEFINE_GLOBAL", offset),
+            OpCode::OpGetLocal => self.byte_instruction("OP_GET_LOCAL", offset),
+            OpCode::OpSetLocal => self.byte_instruction("OP_SET_LOCAL", offset),
             OpCode::OpGetGlobal => self.constant_instruction("OP_GET_GLOBAL", offset),
             OpCode::OpSetGlobal => self.constant_instruction("OP_SET_GLOBAL", offset),
             OpCode::OpEqual => self.simple_instruction("OP_EQUAL", offset),
@@ -139,6 +145,12 @@ impl Chunk {
     pub fn simple_instruction(&self, name: &str, idx: usize) -> usize {
         println!("{}", name);
         idx + 1
+    }
+
+    fn byte_instruction(&self, name: &str, offset: usize) -> usize {
+        let constant_idx: u8 = self.code[offset + 1].into();
+        print!("{:-16}{:4} '", name, &constant_idx);
+        offset + 2
     }
 
     fn constant_instruction(&self, name: &str, offset: usize) -> usize {

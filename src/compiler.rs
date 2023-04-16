@@ -4,6 +4,8 @@ use crate::value::Value;
 
 use std::collections::HashMap;
 
+static USIZE_COUNT: usize = u8::MAX as usize + 1;
+
 #[derive(PartialEq, PartialOrd)]
 enum Precedence {
     None,
@@ -60,8 +62,34 @@ impl<'src> ParseRule<'src> {
     }
 }
 
+pub struct Local<'src> {
+    name: Token<'src>,
+    depth: i32,
+}
+
+impl<'src> Local<'src> {
+    pub fn new(name: Token<'src>, depth: i32 ) -> Local<'src> {
+        Local {name, depth}
+    }
+}
+
+pub struct Compiler<'src> {
+    locals: Vec<Local<'src>>,
+    scope_depth: i32,
+}
+
+impl<'src> Compiler<'src> {
+    pub fn new() -> Compiler<'src> {
+        Compiler {
+            locals: Vec::with_capacity(USIZE_COUNT),
+            scope_depth: 0,
+        }
+    }
+}
+
 pub struct Parser<'src> {
     scanner: Scanner<'src>,
+    compiler: Compiler<'src>,
     current: Token<'src>,
     previous: Token<'src>,
     rules: HashMap<TokenType, ParseRule<'src>>,
@@ -211,6 +239,7 @@ impl<'src> Parser<'src> {
         let dummy_token2 = Token::new(TokenType::Eof, 0, "");
         Parser {
             chunk: Chunk::new(),
+            compiler: Compiler::new(),
             current: dummy_token,
             previous: dummy_token2,
             scanner: Scanner::new(src),
@@ -297,6 +326,21 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn begin_scope(&mut self) {
+        self.compiler.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.compiler.scope_depth -= 1;
+
+        while self.compiler.locals.len() > 0 &&
+            self.compiler.locals[self.compiler.locals.len() - 1].depth > self.compiler.scope_depth
+        {
+            self.emit_byte(OpCode::OpPop);
+            self.compiler.locals.pop();
+        }
+    }
+
     fn binary(&mut self, can_assign: bool) {
         let op_type = self.previous.token_type;
         let rule = self.get_rule(op_type);
@@ -342,19 +386,27 @@ impl<'src> Parser<'src> {
         self.emit_constant(Value::ObjString(st));
     }
 
-    fn named_variable(&mut self, name: Token, can_assign: bool) {
-        let arg = self.identifier_constant(name);
+    fn named_variable(&mut self, name: &Token, can_assign: bool) {
+        let (arg, get_op, set_op) = if let Some(local_arg) = self.resolve_local(*name) {
+            (local_arg, OpCode::OpGetLocal, OpCode::OpSetLocal)
+        } else {
+            (
+                self.identifier_constant(*name),
+                OpCode::OpGetGlobal,
+                OpCode::OpSetGlobal,
+            )
+        };
 
         if can_assign && self.match_type(TokenType::Equal) {
             self.expression();
-            self.emit_bytes(OpCode::OpSetGlobal, arg);
+            self.emit_bytes(set_op, arg as u8);
         } else {
-            self.emit_bytes(OpCode::OpGetGlobal,arg);
+            self.emit_bytes(get_op,arg as u8);
         }
     }
 
     fn variable(&mut self, can_assign: bool ) {
-        self.named_variable(self.previous, can_assign);
+        self.named_variable(&self.previous.clone(), can_assign);
     }
 
     fn unary(&mut self, can_assign: bool) {
@@ -405,13 +457,73 @@ impl<'src> Parser<'src> {
         self.make_constant(Value::ObjString(name.lexeme.to_string().clone()))
     }
 
+    fn identifiers_equal(&self, a: &Token, b: &Token) -> bool {
+        a.lexeme == b.lexeme
+    }
+
+    fn resolve_local(&mut self, name: Token) -> Option<u8> {
+        for (i, local) in self.compiler.locals.iter().rev().enumerate() {
+            if self.identifiers_equal(&name, &local.name) {
+                if local.depth == -1 {
+                    self.error("Cannot read local variable in its own initializer.");
+                }
+                return Some(i as u8);
+            }
+        }
+        return None;
+    }
+
+    fn  add_local(&mut self, name: Token<'src>) {
+        if self.compiler.locals.len() == USIZE_COUNT {
+            self.error("Too many local variables in function.");
+            return;
+        }
+
+        let local = Local::new(name, -1);
+        self.compiler.locals.push(local);
+    }
+
     fn parse_variable(&mut self, err_msg: &str) -> u8 {
         self.consume(TokenType::Identifier, err_msg);
+
+        self.declare_variable();
+        if self.compiler.scope_depth > 0 {
+            return 0;
+        }
+
         self.identifier_constant(self.previous)
     }
 
+    fn mark_initialized(&mut self) {
+        let last = self.compiler.locals.last_mut().unwrap();
+        last.depth = self.compiler.scope_depth
+    }
+
     fn define_variable(&mut self, global: u8) {
+        if self.compiler.scope_depth > 0 {
+            self.mark_initialized();
+            return;
+        }
         self.emit_bytes(OpCode::OpDefineGlobal, global);
+    }
+
+    fn declare_variable(&mut self) {
+        if self.compiler.scope_depth == 0 {
+            return;
+        }
+        let name = self.previous;
+
+        for local in self.compiler.locals.iter().rev() {
+            if local.depth != -1 && local.depth < self.compiler.scope_depth {
+                break;
+            }
+
+            if self.identifiers_equal(&name, &local.name) {
+                self.error("Already a variable with this name in this scope.");
+                break;
+            }
+        }
+        self.add_local(name);
     }
 
     fn get_rule(&self, tk_type: TokenType) -> &ParseRule<'src> {
@@ -420,6 +532,14 @@ impl<'src> Parser<'src> {
 
     fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment);
+    }
+
+    fn block(&mut self) {
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
+            self.declaration();
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.");
     }
 
     fn var_declaration(&mut self) {
@@ -486,6 +606,10 @@ impl<'src> Parser<'src> {
     fn statement(&mut self) {
         if self.match_type(TokenType::Print) {
             self.print_statement();
+        } else if self.match_type(TokenType::LeftBrace) {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
         } else {
             self.expression_statement();
         }
