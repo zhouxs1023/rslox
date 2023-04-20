@@ -296,9 +296,20 @@ impl<'src> Parser<'src> {
         self.chunk.write_byte(byte, self.previous.line);
     }
 
+    fn emit_u8(&mut self, byte: u8) {
+        self.chunk.write_u8(byte, self.previous.line);
+    }
+
     fn emit_bytes(&mut self, byte1: OpCode, byte2: u8) {
         self.emit_byte(byte1);
         self.emit_byte(byte2.into());
+    }
+
+    fn emit_jump(&mut self, instruction: OpCode) -> usize {
+        self.emit_byte(instruction);
+        self.emit_u8(0xff);
+        self.emit_u8(0xff);
+        return self.chunk.code.len() - 2;
     }
 
     fn emit_return(&mut self) {
@@ -317,6 +328,18 @@ impl<'src> Parser<'src> {
     fn emit_constant(&mut self, val: Value) {
         let con_idx = self.make_constant(val);
         self.emit_bytes(OpCode::OpConstant, con_idx);
+    }
+
+    fn patch_jump(&mut self, offset: usize) {
+        // -2 to adjust for the bytecode for the jump offset itself.
+        let jump = self.chunk.code.len() - offset - 2;
+
+        if jump > USIZE_COUNT {
+            self.error("Too much code to jump over.");
+        }
+
+        self.chunk.code[offset] = (((jump >> 8) & 0xff) as u8).into();
+        self.chunk.code[offset + 1] = ((jump & 0xff) as u8).into();
     }
 
     fn end_compiler(&mut self) {
@@ -562,6 +585,17 @@ impl<'src> Parser<'src> {
         self.emit_byte(OpCode::OpPop);
     }
 
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+
+        let then_jump = self.emit_jump(OpCode::OpJumpIfFalse);
+        self.statement();
+
+        self.patch_jump(then_jump);
+    }
+
     fn print_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon,"Expect ';' after value.");
@@ -606,6 +640,8 @@ impl<'src> Parser<'src> {
     fn statement(&mut self) {
         if self.match_type(TokenType::Print) {
             self.print_statement();
+        } else if self.match_type(TokenType::If) {
+            self.if_statement();
         } else if self.match_type(TokenType::LeftBrace) {
             self.begin_scope();
             self.block();

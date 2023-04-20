@@ -144,13 +144,20 @@ impl VM {
                 OpCode::OpDivide => self.binary_op(|a, b| a / b),
                 OpCode::OpNot => {
                     let val = self.stack.pop().unwrap();
-                    self.stack.push(Value::Bool(self.is_falsey(val)))
+                    self.stack.push(Value::Bool(self.is_falsey(&val)))
                 },
 
                 OpCode::OpPrint => {
                     print_value(&self.stack.pop().expect("Empty stack"));
                     println!();
                     return InterpretResult::Ok;
+                },
+
+                OpCode::OpJumpIfFalse => {
+                    let offset = self.read_short();
+                    if self.is_falsey(self.peek(0)) {
+                        self.ip += offset;
+                    }
                 },
 
                 OpCode::OpReturn => { return InterpretResult::Ok; },
@@ -207,6 +214,11 @@ impl VM {
             .expect("Failed to peek");
     }
 
+    fn read_short(&mut self) -> usize {
+        self.ip += 2;
+        (((self.chunk.code[self.ip - 2] as u16) << 8) | self.chunk.code[self.ip - 1] as u16) as usize
+    }
+
     fn read_opcode(&mut self) -> OpCode {
         let val = self.chunk.read_byte(self.ip).into();
         self.ip += 1;
@@ -219,8 +231,8 @@ impl VM {
         self.chunk.get_constant(idx)
     }
 
-    fn is_falsey(&self, val: Value) -> bool {
-        match val {
+    fn is_falsey(&self, val: &Value) -> bool {
+        match *val {
             Value::Bool(b) => !b,
             Value::Nil => true,
             _ => false

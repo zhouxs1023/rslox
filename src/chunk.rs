@@ -23,6 +23,7 @@ pub enum OpCode {
     OpNot,
     OpNegate,
     OpPrint,
+    OpJumpIfFalse,
     OpReturn,
 }
 
@@ -49,7 +50,8 @@ impl From<u8> for OpCode {
             17 => OpCode::OpNot,
             18 => OpCode::OpNegate,
             19 => OpCode::OpPrint,
-            20 => OpCode::OpReturn,
+            20 => OpCode::OpJumpIfFalse,
+            21 => OpCode::OpReturn,
             _  => unimplemented!("Invalid opcode {}", code),
         }
     }
@@ -62,7 +64,7 @@ impl From<OpCode> for u8 {
 }
 
 pub struct Chunk {
-    pub code: Vec<OpCode>,
+    pub code: Vec<u8>,
     pub constants: Vec<Value>,
     pub lines: Vec<usize>,
 }
@@ -77,6 +79,11 @@ impl Chunk {
     }
 
     pub fn write_byte(&mut self, byte: OpCode, line: usize) {
+        self.code.push(byte.into());
+        self.lines.push(line);
+    }
+
+    pub fn write_u8(&mut self, byte: u8, line: usize) {
         self.code.push(byte);
         self.lines.push(line);
     }
@@ -114,7 +121,7 @@ impl Chunk {
             print!("{:4} ", self.lines[offset]);
         }
 
-        let instruction = &self.code[offset];
+        let instruction = &self.code[offset].into();
 
         match instruction {
             OpCode::OpConstant => self.constant_instruction("OP_CONSTANT", offset),
@@ -137,6 +144,7 @@ impl Chunk {
             OpCode::OpNot => self.simple_instruction("OP_NOT", offset),
             OpCode::OpNegate => self.simple_instruction("OP_NEGATE", offset),
             OpCode::OpPrint => self.simple_instruction("OP_PRINT", offset),
+            OpCode::OpJumpIfFalse => self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset),
             OpCode::OpReturn => self.simple_instruction("OP_RETURN", offset),
         }
 
@@ -151,6 +159,17 @@ impl Chunk {
         let constant_idx: u8 = self.code[offset + 1].into();
         print!("{:-16}{:4} '", name, &constant_idx);
         offset + 2
+    }
+
+    fn jump_instruction(&self, name: &str, sign: i16, offset: usize) -> usize {
+        let jump = (((self.code[offset + 1] as u16) << 8) | self.code[offset + 2] as u16) as usize;
+        let jump_to = if sign == 1 {
+            offset + 3 + jump
+        } else {
+            offset + 3 - jump
+        };
+        println!("{:-16} {:4} -> {}", name, offset, jump_to);
+        offset + 3
     }
 
     fn constant_instruction(&self, name: &str, offset: usize) -> usize {
