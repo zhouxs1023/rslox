@@ -160,6 +160,11 @@ impl VM {
                     }
                 },
 
+                OpCode::OpJump => {
+                    let offset = self.read_short();
+                    self.ip += offset;
+                }
+
                 OpCode::OpReturn => { return InterpretResult::Ok; },
             }
         }

@@ -3,6 +3,7 @@ use crate::scanner::{Scanner, Token, TokenType};
 use crate::value::Value;
 
 use std::collections::HashMap;
+use crate::chunk::OpCode::OpPop;
 
 static USIZE_COUNT: usize = u8::MAX as usize + 1;
 
@@ -591,9 +592,17 @@ impl<'src> Parser<'src> {
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
         let then_jump = self.emit_jump(OpCode::OpJumpIfFalse);
+        self.emit_byte(OpCode::OpPop);
         self.statement();
 
+        let else_jump = self.emit_jump(OpCode::OpJump);
+
         self.patch_jump(then_jump);
+        self.emit_byte(OpCode::OpPop);
+        if self.match_type(TokenType::Else) {
+            self.statement();
+        }
+        self.patch_jump(else_jump);
     }
 
     fn print_statement(&mut self) {
