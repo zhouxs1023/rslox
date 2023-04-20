@@ -187,7 +187,7 @@ impl<'src> Parser<'src> {
             TokenType::Number,
             ParseRule::new(Some(Parser::number), None, Precedence::None),
         );
-        rule_map.insert(TokenType::And, ParseRule::new(None, None, Precedence::None));
+        rule_map.insert(TokenType::And, ParseRule::new(None, Some(Parser::and), Precedence::And));
         rule_map.insert(
             TokenType::Class,
             ParseRule::new(None, None, Precedence::None),
@@ -204,7 +204,7 @@ impl<'src> Parser<'src> {
         rule_map.insert(TokenType::Fun, ParseRule::new(None, None, Precedence::None));
         rule_map.insert(TokenType::If, ParseRule::new(None, None, Precedence::None));
         rule_map.insert(TokenType::Nil, ParseRule::new(Some(Parser::literal), None, Precedence::None));
-        rule_map.insert(TokenType::Or, ParseRule::new(None, None, Precedence::None));
+        rule_map.insert(TokenType::Or, ParseRule::new(None, Some(Parser::or), Precedence::Or));
         rule_map.insert(
             TokenType::Print,
             ParseRule::new(None, None, Precedence::None),
@@ -404,6 +404,17 @@ impl<'src> Parser<'src> {
         self.emit_constant(Value::Number(val));
     }
 
+    fn or(&mut self, can_assign: bool) {
+        let else_jump = self.emit_jump(OpCode::OpJumpIfFalse);
+        let end_jump = self.emit_jump(OpCode::OpJump);
+
+        self.patch_jump(else_jump);
+        self.emit_byte(OpCode::OpPop);
+
+        self.parse_precedence(Precedence::Or);
+        self.patch_jump(end_jump);
+    }
+
     fn string(&mut self, can_assign: bool) {
         let len = self.previous.lexeme.len() - 1;
         let st = String::from(&self.previous.lexeme[1..len]);
@@ -529,6 +540,15 @@ impl<'src> Parser<'src> {
             return;
         }
         self.emit_bytes(OpCode::OpDefineGlobal, global);
+    }
+
+    fn and(&mut self, can_assign: bool) {
+        let end_jump = self.emit_jump(OpCode::OpJumpIfFalse);
+
+        self.emit_byte(OpCode::OpPop);
+        self.parse_precedence(Precedence::And);
+
+        self.patch_jump(end_jump);
     }
 
     fn declare_variable(&mut self) {
