@@ -149,8 +149,6 @@ impl VM {
 
                 OpCode::OpPrint => {
                     print_value(&self.stack.pop().expect("Empty stack"));
-                    println!();
-                    return InterpretResult::Ok;
                 },
 
                 OpCode::OpJumpIfFalse => {
@@ -163,7 +161,12 @@ impl VM {
                 OpCode::OpJump => {
                     let offset = self.read_short();
                     self.ip += offset;
-                }
+                },
+
+                OpCode::OpLoop => {
+                    let offset = self.read_short();
+                    self.ip -= offset;
+                },
 
                 OpCode::OpReturn => { return InterpretResult::Ok; },
             }

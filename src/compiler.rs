@@ -306,6 +306,16 @@ impl<'src> Parser<'src> {
         self.emit_byte(byte2.into());
     }
 
+    fn emit_loop(&mut self, loop_start: usize) {
+        self.emit_byte(OpCode::OpLoop);
+
+        let offset = self.chunk.code.len() - loop_start + 2;
+        if offset > u16::MAX.into() { self.error("Loop body too large.")}
+
+        self.emit_u8(((offset >> 8) & 0xff) as u8);
+        self.emit_u8((offset & 0xff) as u8);
+    }
+
     fn emit_jump(&mut self, instruction: OpCode) -> usize {
         self.emit_byte(instruction);
         self.emit_u8(0xff);
@@ -631,6 +641,22 @@ impl<'src> Parser<'src> {
         self.emit_byte(OpCode::OpPrint);
     }
 
+    fn while_statement(&mut self) {
+        let loop_start = self.chunk.code.len();
+        self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+
+        let exit_jump = self.emit_jump(OpCode::OpJumpIfFalse);
+        self.emit_byte(OpCode::OpPop);
+        self.statement();
+
+        self.emit_loop(loop_start);
+
+        self.patch_jump(exit_jump);
+        self.emit_byte(OpCode::OpPop);
+    }
+
     fn synchronize(&mut self) {
         self.panic_mode = false;
 
@@ -671,6 +697,8 @@ impl<'src> Parser<'src> {
             self.print_statement();
         } else if self.match_type(TokenType::If) {
             self.if_statement();
+        } else if self.match_type(TokenType::While) {
+            self.while_statement();
         } else if self.match_type(TokenType::LeftBrace) {
             self.begin_scope();
             self.block();

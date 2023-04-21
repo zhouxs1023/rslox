@@ -25,6 +25,7 @@ pub enum OpCode {
     OpPrint,
     OpJumpIfFalse,
     OpJump,
+    OpLoop,
     OpReturn,
 }
 
@@ -53,7 +54,8 @@ impl From<u8> for OpCode {
             19 => OpCode::OpPrint,
             20 => OpCode::OpJumpIfFalse,
             21 => OpCode::OpJump,
-            22 => OpCode::OpReturn,
+            22 => OpCode::OpLoop,
+            23 => OpCode::OpReturn,
             _ => unimplemented!("Invalid opcode {}", code),
         }
     }
@@ -148,6 +150,7 @@ impl Chunk {
             OpCode::OpPrint => self.simple_instruction("OP_PRINT", offset),
             OpCode::OpJumpIfFalse => self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset),
             OpCode::OpJump => self.jump_instruction("OP_JUMP", 1, offset),
+            OpCode::OpLoop => self.jump_instruction("OP_LOOP", -1, offset),
             OpCode::OpReturn => self.simple_instruction("OP_RETURN", offset),
         }
 
