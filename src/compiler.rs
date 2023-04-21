@@ -616,6 +616,53 @@ impl<'src> Parser<'src> {
         self.emit_byte(OpCode::OpPop);
     }
 
+    fn for_statement(&mut self) {
+        self.begin_scope();
+
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
+
+        if self.match_type(TokenType::Semicolon) {
+            // No initializer.
+        } else if self.match_type(TokenType::Var) {
+            self.var_declaration();
+        } else {
+            self.expression_statement();
+        }
+
+        let mut loop_start = self.chunk.code.len();
+
+        let mut exit_jump = 0;
+        if !self.match_type(TokenType::Semicolon) {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
+
+            exit_jump = self.emit_jump(OpCode::OpJumpIfFalse);
+            self.emit_byte(OpCode::OpPop);
+        }
+
+        if !self.match_type(TokenType::RightParen) {
+            let body_jump = self.emit_jump(OpCode::OpJump);
+            let increment_start = self.chunk.code.len();
+            self.expression();
+            self.emit_byte(OpCode::OpPop);
+            self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+
+            self.emit_loop(loop_start);
+            loop_start = increment_start;
+            self.patch_jump(body_jump);
+        }
+
+        self.statement();
+        self.emit_loop(loop_start);
+
+        if exit_jump != 0 {
+            self.patch_jump(exit_jump);
+            self.emit_byte(OpCode::OpPop);
+        }
+
+        self.end_scope();
+    }
+
     fn if_statement(&mut self) {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
         self.expression();
@@ -695,6 +742,8 @@ impl<'src> Parser<'src> {
     fn statement(&mut self) {
         if self.match_type(TokenType::Print) {
             self.print_statement();
+        } else if self.match_type(TokenType::For) {
+            self.for_statement();
         } else if self.match_type(TokenType::If) {
             self.if_statement();
         } else if self.match_type(TokenType::While) {
