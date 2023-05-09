@@ -67,6 +67,7 @@ impl From<OpCode> for u8 {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Chunk {
     pub code: Vec<u8>,
     pub constants: Vec<Value>,

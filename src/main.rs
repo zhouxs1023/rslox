@@ -9,6 +9,7 @@ mod value;
 mod vm;
 mod compiler;
 mod scanner;
+mod function;
 
 fn main() {
 

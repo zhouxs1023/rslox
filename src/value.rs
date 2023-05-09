@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
+use crate::function::Function;
 
 static ERR_MARGIN: f64 = f64::EPSILON;
 #[derive(Clone, Debug)]
@@ -8,6 +9,7 @@ pub enum Value {
     Nil,
     Number(f64),
     ObjString(String),
+    Function(Function)
 }
 
 pub fn values_equal(a: Value, b: Value) -> bool {
@@ -16,6 +18,7 @@ pub fn values_equal(a: Value, b: Value) -> bool {
         (Value::Bool(a), Value::Bool(b)) => a == b,
         (Value::Nil, Value::Nil) => true,
         (Value::ObjString(str1), Value::ObjString(str2)) => str1 == str2,
+        (Value::Function(a), Value::Function(b)) => a == b,
         _ => false,
     }
 }
@@ -26,6 +29,7 @@ pub fn print_value(val: &Value) {
         Value::Nil              => print!("nil"),
         Value::Number(n) => print!("number: {:?}", n),
         Value::ObjString(str) => print!("Objstring: {:?}", str),
+        Value::Function(fun) => print!("ObjFunction: {}", "(fun)"),
     }
 }
 
@@ -35,6 +39,7 @@ impl fmt::Display for Value {
             Self::Number(val) => write!(f, "{}", val),
             Self::Bool(val) => write!(f, "{}", val),
             Self::ObjString(s) => write!(f, "{}", s),
+            Self::Function(func) => write!(f, "{}", "(func)"),
             Self::Nil => write!(f, "nil"),
         }
     }

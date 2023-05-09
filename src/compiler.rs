@@ -3,7 +3,6 @@ use crate::scanner::{Scanner, Token, TokenType};
 use crate::value::Value;
 
 use std::collections::HashMap;
-use crate::chunk::OpCode::OpPop;
 
 static USIZE_COUNT: usize = u8::MAX as usize + 1;
 
