@@ -1,6 +1,7 @@
 use crate::chunk::{Chunk, OpCode};
 use crate::scanner::{Scanner, Token, TokenType};
 use crate::value::Value;
+use crate::function::Function;
 
 use std::collections::HashMap;
 
@@ -73,7 +74,14 @@ impl<'src> Local<'src> {
     }
 }
 
+enum FunctionType {
+    Function,
+    Script,
+}
+
 pub struct Compiler<'src> {
+    pub function: Function,
+    fn_type: FunctionType,
     locals: Vec<Local<'src>>,
     scope_depth: i32,
 }
@@ -81,6 +89,8 @@ pub struct Compiler<'src> {
 impl<'src> Compiler<'src> {
     pub fn new() -> Compiler<'src> {
         Compiler {
+            function: Function::new(),
+            fn_type: FunctionType::Script,
             locals: Vec::with_capacity(USIZE_COUNT),
             scope_depth: 0,
         }
@@ -89,11 +99,10 @@ impl<'src> Compiler<'src> {
 
 pub struct Parser<'src> {
     scanner: Scanner<'src>,
-    compiler: Compiler<'src>,
+    pub compiler: Compiler<'src>,
     current: Token<'src>,
     previous: Token<'src>,
     rules: HashMap<TokenType, ParseRule<'src>>,
-    pub chunk: Chunk,
     had_error: bool,
     panic_mode: bool,
 }
@@ -238,7 +247,6 @@ impl<'src> Parser<'src> {
         let dummy_token = Token::new(TokenType::Eof, 0, "");
         let dummy_token2 = Token::new(TokenType::Eof, 0, "");
         Parser {
-            chunk: Chunk::new(),
             compiler: Compiler::new(),
             current: dummy_token,
             previous: dummy_token2,
@@ -249,13 +257,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub fn compile(&mut self) -> bool {
+    pub fn compile(&mut self) -> Option<&Function> {
         self.advance();
         while !self.match_type(TokenType::Eof) {
             self.declaration();
         }
-        self.end_compiler();
-        !self.had_error
+        
+        if self.had_error {
+            None
+        } else {
+            self.end_compiler()
+        }
     }
 
     fn advance(&mut self) {
@@ -293,11 +305,13 @@ impl<'src> Parser<'src> {
     }
 
     fn emit_byte(&mut self, byte: OpCode) {
-        self.chunk.write_byte(byte, self.previous.line);
+        let line = self.previous.line;
+        self.current_chunk().write_byte(byte, line);
     }
 
     fn emit_u8(&mut self, byte: u8) {
-        self.chunk.write_u8(byte, self.previous.line);
+        let line = self.previous.line;
+        self.current_chunk().write_u8(byte, line);
     }
 
     fn emit_bytes(&mut self, byte1: OpCode, byte2: u8) {
@@ -308,7 +322,7 @@ impl<'src> Parser<'src> {
     fn emit_loop(&mut self, loop_start: usize) {
         self.emit_byte(OpCode::OpLoop);
 
-        let offset = self.chunk.code.len() - loop_start + 2;
+        let offset = self.current_chunk().code.len() - loop_start + 2;
         if offset > u16::MAX.into() { self.error("Loop body too large.")}
 
         self.emit_u8(((offset >> 8) & 0xff) as u8);
@@ -319,7 +333,7 @@ impl<'src> Parser<'src> {
         self.emit_byte(instruction);
         self.emit_u8(0xff);
         self.emit_u8(0xff);
-        return self.chunk.code.len() - 2;
+        return self.current_chunk().code.len() - 2;
     }
 
     fn emit_return(&mut self) {
@@ -327,7 +341,7 @@ impl<'src> Parser<'src> {
     }
 
     fn make_constant(&mut self, val: Value) -> u8 {
-        if let Some(constant) = self.chunk.add_constant(val) {
+        if let Some(constant) = self.current_chunk().add_constant(val) {
             constant
         } else {
             self.error("Too many constants in one chunk.");
@@ -342,20 +356,33 @@ impl<'src> Parser<'src> {
 
     fn patch_jump(&mut self, offset: usize) {
         // -2 to adjust for the bytecode for the jump offset itself.
-        let jump = self.chunk.code.len() - offset - 2;
+        let jump = self.current_chunk().code.len() - offset - 2;
 
         if jump > USIZE_COUNT {
             self.error("Too much code to jump over.");
         }
 
-        self.chunk.code[offset] = (((jump >> 8) & 0xff) as u8).into();
-        self.chunk.code[offset + 1] = ((jump & 0xff) as u8).into();
+        self.current_chunk().code[offset] = (((jump >> 8) & 0xff) as u8).into();
+        self.current_chunk().code[offset + 1] = ((jump & 0xff) as u8).into();
     }
 
-    fn end_compiler(&mut self) {
+    fn end_compiler(&mut self) -> Option<&Function> {
         self.emit_return();
-        if cfg!(debug_assetions) && !self.had_error {
-            (&self.chunk).disassemble_chunk("code");
+
+        #[cfg(debug_assertions)]
+        if !self.had_error {
+            let name = if self.compiler.function.name != "" {
+                self.compiler.function.name.clone()
+            } else {
+                String::from("<script>")
+            };
+            self.current_chunk().disassemble_chunk(name);
+        }
+
+        if self.had_error {
+            None
+        } else {
+            Some(&self.compiler.function)
         }
     }
 
@@ -628,7 +655,7 @@ impl<'src> Parser<'src> {
             self.expression_statement();
         }
 
-        let mut loop_start = self.chunk.code.len();
+        let mut loop_start = self.current_chunk().code.len();
 
         let mut exit_jump = 0;
         if !self.match_type(TokenType::Semicolon) {
@@ -641,7 +668,7 @@ impl<'src> Parser<'src> {
 
         if !self.match_type(TokenType::RightParen) {
             let body_jump = self.emit_jump(OpCode::OpJump);
-            let increment_start = self.chunk.code.len();
+            let increment_start = self.current_chunk().code.len();
             self.expression();
             self.emit_byte(OpCode::OpPop);
             self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
@@ -688,7 +715,7 @@ impl<'src> Parser<'src> {
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.chunk.code.len();
+        let loop_start = self.current_chunk().code.len();
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
@@ -754,6 +781,10 @@ impl<'src> Parser<'src> {
         } else {
             self.expression_statement();
         }
+    }
+
+    fn current_chunk(&mut self) -> &mut Chunk {
+        &mut self.compiler.function.chunk
     }
 
     fn error_at(&mut self, token: Token, message: &str) {

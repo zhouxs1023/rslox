@@ -39,11 +39,11 @@ impl VM {
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut parser = Parser::new(source);
 
-        if !parser.compile() {
+        if parser.compile().is_none() {
             return InterpretResult::CompileError;
         }
 
-        self.chunk = Rc::new(parser.chunk);
+        self.chunk = Rc::new(parser.compiler.function.chunk);
         self.ip = 0; // or self.chunk.code?
 
         self.run()
